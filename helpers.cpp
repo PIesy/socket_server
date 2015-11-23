@@ -9,31 +9,31 @@ namespace helpers
 {
 
 #ifdef _WIN32
-	void preallocateFile(const std::string & file, size_t size)
-	{
-		//std::fstream f;
-		//char zeroBuff[1024 * 10] = { 0 };
-		//size_t zeroBuffSize = sizeof(zeroBuff);
-		//size_t remainingSize = size;
+    void preallocateFile(const std::string & file, size_t size)
+    {
+        //std::fstream f;
+        //char zeroBuff[1024 * 10] = { 0 };
+        //size_t zeroBuffSize = sizeof(zeroBuff);
+        //size_t remainingSize = size;
 
   //      f.open(file, std::ios_base::out | std::ios_base::trunc | std::ios_base::binary);
-		//if (!f.is_open())
-		//	return;
-		//while (remainingSize > 0)
-		//{
-		//	if (remainingSize < zeroBuffSize)
-		//	{
-		//		f.write(zeroBuff, remainingSize);
-		//		remainingSize = 0;
-		//	}
-		//	else
-		//	{
-		//		f.write(zeroBuff, zeroBuffSize);
-		//		remainingSize -= zeroBuffSize;
-		//	}
-		//}
-		//            No actual speedup this way
-	}
+        //if (!f.is_open())
+        //    return;
+        //while (remainingSize > 0)
+        //{
+        //    if (remainingSize < zeroBuffSize)
+        //    {
+        //        f.write(zeroBuff, remainingSize);
+        //        remainingSize = 0;
+        //    }
+        //    else
+        //    {
+        //        f.write(zeroBuff, zeroBuffSize);
+        //        remainingSize -= zeroBuffSize;
+        //    }
+        //}
+        //            No actual speedup this way
+    }
 
     int getMaxSocketDescriptor(const std::vector<Socket*>& sockets)
     {

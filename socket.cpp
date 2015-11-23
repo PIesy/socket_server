@@ -98,7 +98,7 @@ OperationResult Socket::SendTo(Buffer &data, size_t size, const std::string& ip,
 
 OperationResult Socket::Recieve(Buffer& buff, size_t size, bool peek) const
 {
-    if (!isValid)										 
+    if (!isValid)                                         
         return OperationResult::Error;
     return sockets::getData(socket, buff, size, peek);
 }
@@ -240,21 +240,21 @@ SelectResult buildSelectResult(bool ready, fd_set& r, fd_set& w, fd_set& e,
 
 OperationResult fromBool(bool result)
 {
-	if (result)
-		return OperationResult::Success;
-	return OperationResult::Error;
+    if (result)
+        return OperationResult::Success;
+    return OperationResult::Error;
 }
 
 bool asBool(const OperationResult& result)
 {
     if (result == OperationResult::Error || result == OperationResult::ConnectionClosed)
-		return false;
-	return true;
+        return false;
+    return true;
 }
 
 bool isEndpointState(const OperationResult& result)
 {
-	if (result == OperationResult::PartiallyFinished || result == OperationResult::Timeout)
-		return false;
-	return true;
+    if (result == OperationResult::PartiallyFinished || result == OperationResult::Timeout)
+        return false;
+    return true;
 }
