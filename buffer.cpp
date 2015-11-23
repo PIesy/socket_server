@@ -7,8 +7,8 @@ Buffer::Buffer(size_t size)
 
 Buffer::~Buffer()
 {
-	if (isOwnBuffer)
-		delete[] data;
+    if (isOwnBuffer)
+        delete[] data;
 }
 
 Buffer::Buffer(const Buffer& b)
@@ -29,7 +29,7 @@ void Buffer::init(size_t size)
 
 size_t Buffer::getSize()
 {
-	return size;
+    return size;
 }
 
 byte* Buffer::getData()
@@ -39,7 +39,7 @@ byte* Buffer::getData()
 
 const byte* Buffer::getData() const
 {
-	return data;
+    return data;
 }
 
 byte* Buffer::getWritePointer()
@@ -63,8 +63,8 @@ void Buffer::Clear(bool full)
 {
     readOffset = 0;
     writeOffset = 0;
-	if (full)
-		memset(data, 0, size);
+    if (full)
+        memset(data, 0, size);
 }
 
 void Buffer::setWriteOffset(size_t writeOffset)

@@ -143,16 +143,16 @@ void Server::parseCommand(ClientContainer client)
     OperationResult operationCompleted = OperationResult::PartiallyFinished;
 
     switch (header.command)
-	{
+    {
     case integral(ServerCommand::FileTransferStart):
         operationCompleted = handleFileTransferInit(client);
-		break;
+        break;
     case integral(ServerCommand::FileTransferExecute):
         operationCompleted = handleFileTransfer(client);
-		break;
+        break;
     case integral(ServerCommand::Echo):
         operationCompleted = handleEcho(client);
-		break;
+        break;
     case integral(ServerCommand::Identify):
         client->setState(getState(header.id));
     }

@@ -31,8 +31,8 @@ namespace sockets {
     {
         SOCKET socket;
         bool isValid = false;
-		AddressIn address;
-		int type = STREAM;
+        AddressIn address;
+        int type = STREAM;
     };
 
     void init();

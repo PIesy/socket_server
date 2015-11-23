@@ -27,7 +27,7 @@ Socket createSocket(int domain, int type, int protocol)
 
     result.isValid = sock != -1;
     result.socket = sock;
-	result.type = type;
+    result.type = type;
     return result;
 }
 
@@ -37,7 +37,7 @@ bool bindSocket(Socket& socket, const AddressIn& address)
 
     if (bind(socket.socket, (sockaddr*)&addr, sizeof(addr)) < 0)
         return false;
-	socket.address = address;
+    socket.address = address;
     return true;
 }
 
@@ -59,7 +59,7 @@ Socket accept(const Socket& socket, AddressIn& outputAddress)
     outputAddress = fillAddress(output);
     sock.isValid = true;
     sock.socket = result;
-	sock.address = outputAddress;
+    sock.address = outputAddress;
     return sock;
 }
 
@@ -118,13 +118,13 @@ bool connect(Socket& socket, AddressIn& outputAddress)
 bool isConnectionAlive(const Socket& socket, bool OOB)
 {
     char error = 0;
-	char buff = 0;
+    char buff = 0;
     size_t sz = sizeof(error);
-	int err = 0, result = 0;
-	result = recv(socket.socket, &error, 1, MSG_PEEK);
-	err = WSAGetLastError();
-	if (result == -1 && (err != WSAETIMEDOUT && err != WSAEWOULDBLOCK))
-		return false;
+    int err = 0, result = 0;
+    result = recv(socket.socket, &error, 1, MSG_PEEK);
+    err = WSAGetLastError();
+    if (result == -1 && (err != WSAETIMEDOUT && err != WSAEWOULDBLOCK))
+        return false;
 
     getsockopt(socket.socket, SOL_SOCKET, SO_ERROR, &error, (int*)&sz);
     return error == 0;
@@ -132,44 +132,44 @@ bool isConnectionAlive(const Socket& socket, bool OOB)
 
 void setReadTimeout(Socket& socket, int timeout)
 {
-	setsockopt(socket.socket, SOL_SOCKET, SO_RCVTIMEO, (const char*)&timeout, sizeof(DWORD));
+    setsockopt(socket.socket, SOL_SOCKET, SO_RCVTIMEO, (const char*)&timeout, sizeof(DWORD));
 }
 
 void setWriteTimeout(Socket& socket, int timeout)
 {
-	setsockopt(socket.socket, SOL_SOCKET, SO_SNDTIMEO, (const char*)&timeout, sizeof(DWORD));
+    setsockopt(socket.socket, SOL_SOCKET, SO_SNDTIMEO, (const char*)&timeout, sizeof(DWORD));
 }
 
 unsigned getSendBuffSize(Socket& socket)
 {
-	unsigned result;
-	size_t sz = sizeof(result);
+    unsigned result;
+    size_t sz = sizeof(result);
 
     getsockopt(socket.socket, SOL_SOCKET, SO_SNDBUF, (char*)&result, (int*)&sz);
-	return result;
+    return result;
 }
 
 void setSendBuffSize(Socket& socket, unsigned size)
 {
-	setsockopt(socket.socket, SOL_SOCKET, SO_SNDBUF, (const char*)&size, (int)sizeof(size));
+    setsockopt(socket.socket, SOL_SOCKET, SO_SNDBUF, (const char*)&size, (int)sizeof(size));
 }
 
 void enableKeepAlive(Socket& socket)
 {
-	BOOL val = TRUE;
+    BOOL val = TRUE;
 
-	setsockopt(socket.socket, SOL_SOCKET, SO_KEEPALIVE, (const char*)&val, (int)sizeof(val));
+    setsockopt(socket.socket, SOL_SOCKET, SO_KEEPALIVE, (const char*)&val, (int)sizeof(val));
 }
 
 OperationResult getData(const Socket& socket, Buffer& buff, size_t size, bool OOB)
 {
-	if (buff.getSize() < size)
-		return OperationResult::Error;
-	int result = recv(socket.socket, (char*)buff.getData(), size, OOB ? MSG_OOB : 0);
+    if (buff.getSize() < size)
+        return OperationResult::Error;
+    int result = recv(socket.socket, (char*)buff.getData(), size, OOB ? MSG_OOB : 0);
 
-	if (result > 0)
-		buff.setBytesWritten(result);
-	return parseReturnValue(result, size);
+    if (result > 0)
+        buff.setBytesWritten(result);
+    return parseReturnValue(result, size);
 }
 
 OperationResult getDataFrom(const Socket& socket, Buffer& buff, size_t size, AddressIn& addr, bool peek)
@@ -214,25 +214,25 @@ OperationResult sendDataTo(const Socket &socket, Buffer &data, size_t size, cons
 
 OperationResult parseReturnValue(int value, int expectedValue)
 {
-	if (value > 0)
-	{
-		if (value != expectedValue)
-			return OperationResult::PartiallyFinished;
-		return OperationResult::Success;
-	}
-	if (value == 0)
-		return OperationResult::ConnectionClosed;
-	int err = WSAGetLastError();
+    if (value > 0)
+    {
+        if (value != expectedValue)
+            return OperationResult::PartiallyFinished;
+        return OperationResult::Success;
+    }
+    if (value == 0)
+        return OperationResult::ConnectionClosed;
+    int err = WSAGetLastError();
 
-	switch (err)
-	{
-	case WSAEWOULDBLOCK:
-	case WSAETIMEDOUT:
-		return OperationResult::Timeout;
-	default:
-		break;
-	}
-	return OperationResult::Error;
+    switch (err)
+    {
+    case WSAEWOULDBLOCK:
+    case WSAETIMEDOUT:
+        return OperationResult::Timeout;
+    default:
+        break;
+    }
+    return OperationResult::Error;
 }
 
 void end()
