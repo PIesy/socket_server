@@ -18,7 +18,6 @@ int main(int argc, char** argv)
         std::cerr << "Cannot bind socket" << std::endl;
         return -1;
     }
-
     
     while (1)
     {

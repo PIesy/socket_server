@@ -43,7 +43,7 @@ namespace helpers
 #ifdef __unix__
     void preallocateFile(const std::string & file, size_t size)
     {
-        int f = open64(file.c_str(), O_CREAT | O_TRUNC | O_RDWR);
+        int f = open64(file.c_str(), O_CREAT | O_TRUNC | O_RDWR, S_IRWXU | S_IRGRP | S_IROTH);
 
         fallocate64(f, 0, 0, size);
         close(f);

@@ -50,7 +50,6 @@ struct FileTransferState
     unsigned chunkId = 0;
     unsigned nextChunkSize = 0;
     double downladProgress = 0;
-    double printedProgress = 0;
 };
 
 struct MachineState

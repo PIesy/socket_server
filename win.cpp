@@ -196,7 +196,7 @@ OperationResult sendData(const Socket& socket, Buffer& data, size_t size)
     int result = send(socket.socket, (char*)data.getReadPointer(), size, 0);
 
     if (result > 0)
-        data.setReadOffset(result);
+        data.setReadOffset(result + data.getReadOffset());
     return parseReturnValue(result, size);
 }
 
@@ -208,7 +208,7 @@ OperationResult sendDataTo(const Socket &socket, Buffer &data, size_t size, cons
     int result = sendto(socket.socket, (char*)data.getReadPointer(), size, 0, (sockaddr*)&ad, sizeof(ad));
 
     if (result > 0)
-        data.setReadOffset(result);
+        data.setReadOffset(result + data.getReadOffset());
     return parseReturnValue(result, size);
 }
 

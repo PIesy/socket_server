@@ -30,6 +30,7 @@ class Server
     std::condition_variable handlerBusy;
     ClientContainer getUdpClient(u_int8_t id, const std::string& ip, unsigned short port);
     MachineState& getState(u_int8_t id);
+    double printDownloadState(unsigned chunksTransfered, unsigned chunksCount, double lastValue, double minStep = 1.0);
     void udpConnectionHandler();
     void tcpConnectionHandler(ClientContainer client);
     OperationResult getData(ClientContainer client);

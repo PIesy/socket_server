@@ -77,7 +77,6 @@ OperationResult Socket::Listen(int maxClientsNumber)
 OperationResult Socket::Create(SocketType type)
 {
     socket = sockets::createSocket(sockets::INET, helpers::integral(type), 0);
-    sockets::enableKeepAlive(socket);
     isValid = socket.isValid;
     return fromBool(isValid);
 }

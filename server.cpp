@@ -102,18 +102,17 @@ void Server::tcpConnectionHandler(ClientContainer client)
     std::list<ClientContainer> clients = {client};
 
     std::cerr << "Ready for connections" << std::endl;
-    while (!shutdown)
-    {
+    while (!shutdown && !clients.empty())
         serveAll(clients);
-    }
+    std::cerr << "Connection handler stopped" << std::endl;
 }
 
 OperationResult Server::serveAll(std::list<ClientContainer>& clients)
 {
-    ClientStates res;
+    ClientStates state;
 
-    if ((res = select({}, {clients}, {}, 100000)))
-        for (ClientContainer& client: res.clients.at(res.Readable))
+    if ((state = select({}, {clients}, {}, 100000)))
+        for (ClientContainer& client: state.clients.at(state.Readable))
             if (serve(client) == OperationResult::ConnectionClosed)
                 clients.remove(client);
     if (clients.empty())
@@ -200,12 +199,15 @@ OperationResult Server::handleFileTransferInit(ClientContainer client)
     MachineState& state = client->getState();
 
     state.fileInitState.chunksCount = pack.chunksCount;
-    helpers::preallocateFile(pack.fileName, pack.fileSize);
     state.fileInitState.chunksSize = pack.chunkSize;
     state.fileInitState.fileName = pack.fileName;
     memset(&client->getState().fileTransferState, 0, sizeof(FileTransferState));
     state.fileInitState.file.close();
-    state.fileInitState.file.open(pack.fileName, std::ios_base::out | std::ios_base::in | std::ios_base::binary);
+    std::string fileName = std::to_string(pack.header.id) + "_" + pack.fileName;
+    helpers::preallocateFile(fileName, pack.fileSize);
+    state.fileInitState.file.open(fileName, std::ios_base::out | std::ios_base::in | std::ios_base::binary);
+    if (!state.fileInitState.file.is_open())
+        std::cerr << "WTF" << std::endl;
     std::cerr << "Recieving file " << pack.fileName << " size: " << pack.fileSize << " chunks: " << pack.chunksCount << std::endl;
     return OperationResult::Success;
 }
@@ -249,25 +251,31 @@ OperationResult Server::handleFileTransferPrepare(ClientContainer client)
 
 OperationResult Server::handleFileTransferExecute(ClientContainer client)
 {
-    using ios_base = std::ios_base;
     FileInitState& params = client->getState().fileInitState;
     FileTransferState& transferState = client->getState().fileTransferState;
     std::fstream& file = params.file;
-    if (transferState.previousChunkId != transferState.chunkId - 1)
-        file.seekp(transferState.chunkId * params.chunksSize, ios_base::beg);
 
+    if (transferState.previousChunkId != transferState.chunkId - 1)
+        file.seekp(transferState.chunkId * params.chunksSize, std::ios_base::beg);
     file.write((const char*)client->getState().buff.getReadPointer(), transferState.nextChunkSize);
+    file.flush();
     transferState.chunksTransfered++;
-    transferState.downladProgress = (transferState.chunksTransfered / (double)params.chunksCount) * 100.0;
-    if ((transferState.downladProgress - transferState.printedProgress) > 1)
-    {
-        transferState.printedProgress = transferState.downladProgress;
-        std::cerr << "Downloaded " << transferState.printedProgress
-                  << "% chunk size " << transferState.nextChunkSize << std::endl;
-    }
+    transferState.downladProgress = printDownloadState(transferState.chunksTransfered, params.chunksCount, transferState.downladProgress);
     client->getState().buff.Clear();
     transferState.previousChunkId = transferState.chunkId;
     return OperationResult::Success;
+}
+
+double Server::printDownloadState(unsigned chunksTransfered, unsigned chunksCount, double lastValue, double minStep)
+{
+    double downladProgress = (chunksTransfered / (double)chunksCount) * 100.0;
+
+    if ((downladProgress - lastValue) > minStep)
+    {
+        std::cerr << "Downloaded " << downladProgress << "%" << std::endl;
+        return downladProgress;
+    }
+    return lastValue;
 }
 
 void Server::parseMessage(ClientContainer client)
@@ -315,7 +323,7 @@ void Server::spawner()
             if (connectionSocket.IsValid())
             {
                 std::cerr << "Accepted connection " << connectionSocket.getIp() << ":" << connectionSocket.getPort() << std::endl;
-                threads.emplace_back(&Server::tcpConnectionHandler, this, std::make_shared<TCPClient>(tcpServerSocket));
+                threads.emplace_back(&Server::tcpConnectionHandler, this, std::make_shared<TCPClient>(connectionSocket));
             }
         }
     }
