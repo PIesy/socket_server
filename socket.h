@@ -45,6 +45,7 @@ public:
     OperationResult Listen(int maxClientsNumber = 1024);
     OperationResult Accept(Socket& client) const;
     OperationResult Connect(const std::string& ip, unsigned short port);
+    void Invalidate();
     void SetReadTimeout(int timeout);
     void SetWriteTimeout(int timeout);
     bool IsConnected(bool OOB) const;

@@ -5,15 +5,16 @@
 #include <list>
 #include "helpers.h"
 
-Server::Server(int connectionsPerThread)
+Server::Server(bool noInit)
 {
     sockets::init();
+    if (noInit)
+        return;
     if (tcpServerSocket.Create(SocketType::TCP) == OperationResult::Error)
         std::cerr << "Error in opening tcp socket" << std::endl;
     if (udpServerSocket.Create(SocketType::UDP) == OperationResult::Error)
         std::cerr << "Error in opening udp socket" << std::endl;
     sockets::setRecieveBuffSize(udpServerSocket.getSocket(), 2000000);
-    maxConnectionsPerThread = connectionsPerThread;
     std::cerr << "Buff size: " << sockets::getRecieveBuffSize(udpServerSocket.getSocket()) << std::endl;
 //    tcpServerSocket.SetReadTimeout(1);
     tcpServerSocket.SetWriteTimeout(1);
@@ -24,7 +25,6 @@ Server::Server(int connectionsPerThread)
 Server::~Server()
 {
     shutdown = true;
-    handlerBusy.notify_all();
     for (std::thread& thread : threads)
     {
         try {
@@ -43,7 +43,7 @@ bool Server::Listen(unsigned short port, const std::string& ip)
         return false;
     if (tcpServerSocket.Listen() == OperationResult::Error)
         return false;
-    threads.emplace_back(&Server::udpConnectionHandler, this);
+    threads.emplace_back(&Server::UdpConnectionHandler, this);
     threads.emplace_back(&Server::spawner, this);
     return true;
 }
@@ -51,7 +51,6 @@ bool Server::Listen(unsigned short port, const std::string& ip)
 void Server::Shutdown()
 {
     shutdown = true;
-    handlerBusy.notify_all();
     for (std::thread& thread : threads)
     {
         try
@@ -62,7 +61,7 @@ void Server::Shutdown()
     }
 }
 
-void Server::udpConnectionHandler()
+void Server::UdpConnectionHandler()
 {
     std::list<ClientContainer> clients;
     unsigned short port;
@@ -97,7 +96,7 @@ ClientContainer Server::getUdpClient(u_int8_t id, const std::string& ip, unsigne
     return udpClients.at(id);
 }
 
-void Server::tcpConnectionHandler(ClientContainer client)
+void Server::TcpConnectionHandler(ClientContainer client)
 {
     std::list<ClientContainer> clients = {client};
 
@@ -198,16 +197,14 @@ OperationResult Server::handleFileTransferInit(ClientContainer client)
     FileInitPackage& pack = client->getState().buff;
     MachineState& state = client->getState();
 
+    memset(&client->getState().fileTransferState, 0, sizeof(FileTransferState));
     state.fileInitState.chunksCount = pack.chunksCount;
     state.fileInitState.chunksSize = pack.chunkSize;
     state.fileInitState.fileName = pack.fileName;
-    memset(&client->getState().fileTransferState, 0, sizeof(FileTransferState));
     state.fileInitState.file.close();
     std::string fileName = std::to_string(pack.header.id) + "_" + pack.fileName;
     helpers::preallocateFile(fileName, pack.fileSize);
     state.fileInitState.file.open(fileName, std::ios_base::out | std::ios_base::in | std::ios_base::binary);
-    if (!state.fileInitState.file.is_open())
-        std::cerr << "WTF" << std::endl;
     std::cerr << "Recieving file " << pack.fileName << " size: " << pack.fileSize << " chunks: " << pack.chunksCount << std::endl;
     return OperationResult::Success;
 }
@@ -231,15 +228,11 @@ OperationResult Server::handleFileTransferPrepare(ClientContainer client)
     if (!client->getState().fileInitState.chunksCount)
         return OperationResult::Error;
     FileTransferState& state = client->getState().fileTransferState;
-
     FileTransferPackage& pack = client->getState().buff;
+
     if (pack.isMarker == 1)
     {
-        Buffer buff(markerResponceSize);
-        buff.Write(client->getState().fileTransferState.batchState);
-        state.batchSize = pack.size;
-        client->Send(buff.getSize(), buff, false);
-        state.batchState.reset();
+        respondToMarker(client, pack);
         return OperationResult::Error;
     }
     state.batchState[pack.chunkId % state.batchSize] = true;
@@ -247,6 +240,26 @@ OperationResult Server::handleFileTransferPrepare(ClientContainer client)
     state.chunkId = pack.chunkId;
     client->getState().buff.setReadOffset(sizeof(FileTransferPackage));
     return OperationResult::Success;
+}
+
+void Server::respondToMarker(ClientContainer client, FileTransferPackage& pack)
+{
+    Buffer buff(markerResponceSize);
+    buff.Write(client->getState().fileTransferState.batchState);
+    if (pack.size)
+        client->getState().fileTransferState.batchSize = pack.size;
+    client->Send(buff.getSize(), buff, false);
+    printMissingPackages(client, pack);
+    client->getState().fileTransferState.batchState.reset();
+}
+
+void Server::printMissingPackages(ClientContainer client, FileTransferPackage& pack)
+{
+    if (pack.chunkId == 0)
+        return;
+    for (unsigned chunkId = pack.chunkId - pack.size; chunkId < pack.chunkId; chunkId ++)
+        if (client->getState().fileTransferState.batchState[chunkId % pack.size] == false)
+            std::cerr << "Missing package " << chunkId << std::endl;
 }
 
 OperationResult Server::handleFileTransferExecute(ClientContainer client)
@@ -258,7 +271,6 @@ OperationResult Server::handleFileTransferExecute(ClientContainer client)
     if (transferState.previousChunkId != transferState.chunkId - 1)
         file.seekp(transferState.chunkId * params.chunksSize, std::ios_base::beg);
     file.write((const char*)client->getState().buff.getReadPointer(), transferState.nextChunkSize);
-    file.flush();
     transferState.chunksTransfered++;
     transferState.downladProgress = printDownloadState(transferState.chunksTransfered, params.chunksCount, transferState.downladProgress);
     client->getState().buff.Clear();
@@ -316,16 +328,28 @@ void Server::spawner()
     Socket connectionSocket;
 
     while (!shutdown)
-    {
         if (select({&tcpServerSocket}, {}, {}, 10000) && !shutdown)
         {
             tcpServerSocket.Accept(connectionSocket);
             if (connectionSocket.IsValid())
             {
                 std::cerr << "Accepted connection " << connectionSocket.getIp() << ":" << connectionSocket.getPort() << std::endl;
-                threads.emplace_back(&Server::tcpConnectionHandler, this, std::make_shared<TCPClient>(connectionSocket));
+                launchNewProcess(connectionSocket);
+                //threads.emplace_back(&Server::TcpConnectionHandler, this, std::make_shared<TCPClient>(connectionSocket));
             }
         }
-    }
     std::cerr << "spawner stopped" << std::endl;
+}
+
+void Server::launchNewProcess(Socket& socket)
+{
+    ChildProcessData data;
+    helpers::SharedMemoryDescriptor desc = helpers::createSharedMemory(sizeof(data), "child" + std::to_string(childMemoryId));
+
+    data.shutdown = &shutdown;
+    data.socket = socket.getSocket();
+    socket.Invalidate();
+    childMemoryId++;
+    memcpy(desc.memory, &data, sizeof(data));
+    helpers::createProcess("spolks1", {"child", desc.name});
 }

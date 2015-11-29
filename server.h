@@ -14,25 +14,25 @@
 #include "tcpclient.h"
 #include "udpclient.h"
 
-enum class HandlerType {None, UDP, TCP};
+struct ChildProcessData
+{
+    sockets::Socket socket;
+    bool* shutdown;
+};
 
 class Server
 {
     bool shutdown = false;
-    int maxConnectionsPerThread = 100;
-    HandlerType requiredHandler = HandlerType::None;
+    int childMemoryId = 0;
     Socket tcpServerSocket;
     Socket udpServerSocket;
     std::vector<std::thread> threads;
     std::unordered_map<u_int16_t, MachineState> tcpClients;
     std::unordered_map<u_int16_t, ClientContainer> udpClients;
-    std::mutex handlerMutex;
-    std::condition_variable handlerBusy;
     ClientContainer getUdpClient(u_int8_t id, const std::string& ip, unsigned short port);
     MachineState& getState(u_int8_t id);
     double printDownloadState(unsigned chunksTransfered, unsigned chunksCount, double lastValue, double minStep = 1.0);
-    void udpConnectionHandler();
-    void tcpConnectionHandler(ClientContainer client);
+    void launchNewProcess(Socket& socket);
     OperationResult getData(ClientContainer client);
     OperationResult handleEcho(ClientContainer client);
     OperationResult handleFileTransferInit(ClientContainer client);
@@ -41,13 +41,17 @@ class Server
     OperationResult handleFileTransferExecute(ClientContainer client);
     OperationResult serveAll(std::list<ClientContainer>& clients);
     OperationResult serve(ClientContainer client);
+    void respondToMarker(ClientContainer client, FileTransferPackage& pack);
+    void printMissingPackages(ClientContainer client, FileTransferPackage& pack);
     void parseMessage(ClientContainer client);
     void parseCommand(ClientContainer client);
     void spawner();
 public:
-    Server(int connectionsPerThread = 100);
+    Server(bool noInit = false);
     ~Server();
     bool Listen(unsigned short port, const std::string& ip);
+    void UdpConnectionHandler();
+    void TcpConnectionHandler(ClientContainer client);
     void Shutdown();
 };
 

@@ -1,13 +1,37 @@
 #include <iostream>
 #include "server.h"
-#include <fstream>
+#include "helpers.h"
+
+void handleChildMode(char** argv);
+void handleParentMode(int argc, char** argv);
 
 int main(int argc, char** argv)
 {
-    Server server(3);
-    std::string str;
+    if (std::string(argv[0]) == "child")
+        handleChildMode(argv);
+    else
+        handleParentMode(argc, argv);
+    std::cerr << "Process terminated" << std::endl;
+    return 0;
+}
+
+void handleChildMode(char** argv)
+{
+    std::cerr << "This is child process " << argv[1] << std::endl;
+    helpers::SharedMemoryDescriptor desc = helpers::openSharedMemory(sizeof(ChildProcessData), argv[1]);
+    ChildProcessData* data = (ChildProcessData*)desc.memory;
+    Server server(true);
+    Socket sock(data->socket);
+    server.TcpConnectionHandler(std::make_shared<TCPClient>(sock));
+}
+
+void handleParentMode(int argc, char **argv)
+{
     long port = 2115;
     std::string ip = "127.0.0.1";
+    Server server;
+    std::string str;
+
     if (argc > 2)
     {
         ip = argv[1];
@@ -16,9 +40,8 @@ int main(int argc, char** argv)
     if (!server.Listen(port, ip))
     {
         std::cerr << "Cannot bind socket" << std::endl;
-        return -1;
+        return;
     }
-    
     while (1)
     {
         std::cin >> str;
@@ -28,5 +51,4 @@ int main(int argc, char** argv)
             break;
         }
     }
-    return 0;
 }

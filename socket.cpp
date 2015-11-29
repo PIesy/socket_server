@@ -113,6 +113,11 @@ OperationResult Socket::RecieveFrom(Buffer &buff, size_t size, std::string& ip, 
     return res;
 }
 
+void Socket::Invalidate()
+{
+    isValid = false;
+}
+
 sockets::Socket& Socket::getSocket()
 {
     return socket;

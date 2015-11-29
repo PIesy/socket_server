@@ -78,7 +78,7 @@ sockaddr_in buildAddress(const AddressIn& address)
     in_addr p;
 
     memset(&addr, 0, sizeof(addr));
-    p.s_addr = inet_addr(address.ip.c_str());
+    p.s_addr = inet_addr(address.ip);
     addr.sin_family = address.domain;
     addr.sin_port = htons(address.port);
     addr.sin_addr = p;
@@ -90,7 +90,8 @@ AddressIn fillAddress(const sockaddr_in& addr)
     AddressIn result;
 
     result.domain = addr.sin_family;
-    result.ip = inet_ntoa(addr.sin_addr);
+    std::string str = inet_ntoa(addr.sin_addr);
+    memcpy(result.ip, str.c_str(), str.length());
     result.port = ntohs(addr.sin_port);
     return result;
 }
@@ -166,6 +167,13 @@ void enableKeepAlive(const Socket& socket)
     int val = 1;
 
     setsockopt(socket.socket, SOL_SOCKET, SO_KEEPALIVE, &val, (socklen_t)sizeof(val));
+}
+
+void enableAddressReusing(const Socket& socket)
+{
+    int val = 1;
+
+    setsockopt(socket.socket, SOL_SOCKET, SO_REUSEADDR, &val, (socklen_t)sizeof(val));
 }
 
 OperationResult getData(const Socket& socket, Buffer& buff, size_t size, bool peek)

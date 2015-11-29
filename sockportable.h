@@ -23,8 +23,15 @@ namespace sockets {
     struct AddressIn
     {
         unsigned short port;
-        std::string ip;
+        char ip[18] = {0};
         int domain;
+        AddressIn() {}
+        AddressIn(unsigned short port, const std::string& ip, int domain)
+        {
+            this->port = port;
+            memcpy(this->ip, ip.c_str(), ip.length());
+            this->domain = domain;
+        }
     };
 
     struct Socket
@@ -50,6 +57,8 @@ namespace sockets {
     void setRecieveBuffSize(const Socket& socket, unsigned size);
 
     void enableKeepAlive(const Socket& socket);
+
+    void enableAddressReusing(const Socket& socket);
 
     Socket createSocket(int domain, int type, int protocol);
 

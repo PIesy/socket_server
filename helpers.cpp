@@ -1,8 +1,16 @@
 #include "helpers.h"
 #include <fstream>
 #ifdef __unix__
-#include <fcntl.h>
 #include <unistd.h>
+#include <spawn.h>
+#include <sys/wait.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#endif
+
+#ifdef __unix__
+extern char **environ;
 #endif
 
 namespace helpers
@@ -57,6 +65,57 @@ namespace helpers
             if (sock->getSocket().socket > maxVal)
                 maxVal = sock->getSocket().socket;
         return maxVal;
+    }
+
+    ProcessDescripor createProcess(const std::string& executable, std::vector<std::string> args)
+    {
+        ProcessDescripor desc;
+        char** arguments;
+        arguments = new char*[args.size() + 1]();
+        for (size_t i = 0; i < args.size(); i++)
+        {
+            arguments[i] = new char[args[i].length() + 1]();
+            memcpy(arguments[i], args[i].c_str(), args[i].length());
+        }
+
+        posix_spawn(&desc.process, executable.c_str(), nullptr, nullptr, arguments, environ);
+        return desc;
+    }
+
+    void waitProcess(ProcessDescripor& descriptor)
+    {
+        int status;
+
+        waitpid(descriptor.process, &status, 0);
+    }
+
+    SharedMemoryDescriptor createSharedMemory(size_t size, const std::string& name)
+    {
+        SharedMemoryDescriptor result;
+
+        result.name = name;
+        result.size = size;
+        result.handle = shm_open(name.c_str(), O_CREAT | O_RDWR | O_TRUNC, S_IRWXU | S_IRGRP | S_IROTH);
+        ftruncate(result.handle, size);
+        result.memory = mmap(nullptr, size, PROT_READ | PROT_WRITE, MAP_SHARED, result.handle, 0);
+        return result;
+    }
+
+    SharedMemoryDescriptor openSharedMemory(size_t size, const std::string& name)
+    {
+        SharedMemoryDescriptor result;
+
+        result.name = name;
+        result.size = size;
+        result.handle = shm_open(name.c_str(), O_RDWR, 0);
+        result.memory = mmap(nullptr, size, PROT_READ, MAP_SHARED, result.handle, 0);
+        return result;
+    }
+
+    void removeSharedMemory(SharedMemoryDescriptor& desc)
+    {
+        shm_unlink(desc.name.c_str());
+        munmap(desc.memory, desc.size);
     }
 
 #endif

@@ -52,13 +52,6 @@ struct FileTransferPackage
     FileTransferPackage(u_int32_t chunkId = 0):chunkId(chunkId) {}
 };
 
-struct EchoPackage
-{
-    Header header;
-    u_int32_t stringSize;
-    EchoPackage(u_int32_t stringSize = 0):stringSize(stringSize) {}
-};
-
 constexpr size_t markerResponceSize = sizeof(std::bitset<512>);
 
 struct MarkerResponce
