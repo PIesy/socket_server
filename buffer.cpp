@@ -69,7 +69,7 @@ void Buffer::Clear(bool full)
 
 void Buffer::setWriteOffset(size_t writeOffset)
 {
-    this->writeOffset += writeOffset;
+    this->writeOffset = writeOffset;
 }
 
 size_t Buffer::getWriteOffset() const
@@ -79,7 +79,7 @@ size_t Buffer::getWriteOffset() const
 
 void Buffer::setReadOffset(size_t readOffset)
 {
-    this->readOffset += readOffset;
+    this->readOffset = readOffset;
 }
 
 size_t Buffer::getReadOffset() const

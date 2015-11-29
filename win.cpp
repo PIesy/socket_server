@@ -168,7 +168,7 @@ OperationResult getData(const Socket& socket, Buffer& buff, size_t size, bool OO
     int result = recv(socket.socket, (char*)buff.getData(), size, OOB ? MSG_OOB : 0);
 
     if (result > 0)
-        buff.setBytesWritten(result);
+        buff.setWriteOffset(result + buff.getWriteOffset());
     return parseReturnValue(result, size);
 }
 
@@ -184,7 +184,7 @@ OperationResult getDataFrom(const Socket& socket, Buffer& buff, size_t size, Add
     if (result > 0)
     {
         addr = fillAddress(ad);
-        buff.setWriteOffset(result);
+        buff.setWriteOffset(result + buff.getWriteOffset());
     }
     return parseReturnValue(result, size);
 }

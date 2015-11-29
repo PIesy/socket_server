@@ -175,7 +175,7 @@ OperationResult getData(const Socket& socket, Buffer& buff, size_t size, bool pe
     int result = recv(socket.socket, buff.getWritePointer(), size, peek ? MSG_PEEK : 0);
 
     if (result > 0)
-        buff.setWriteOffset(result);
+        buff.setWriteOffset(result + buff.getWriteOffset());
     return parseReturnValue(result, size);
 }
 
@@ -191,7 +191,7 @@ OperationResult getDataFrom(const Socket& socket, Buffer& buff, size_t size, Add
     if (result > 0)
     {
         addr = fillAddress(ad);
-        buff.setWriteOffset(result);
+        buff.setWriteOffset(result + buff.getWriteOffset());
     }
     return parseReturnValue(result, size);
 }
@@ -203,7 +203,7 @@ OperationResult sendData(const Socket& socket, Buffer& data, size_t size)
     int result = send(socket.socket, data.getReadPointer(), size, MSG_NOSIGNAL);
 
     if (result > 0)
-        data.setReadOffset(result);
+        data.setReadOffset(result + data.getReadOffset());
     return parseReturnValue(result, size);
 }
 
@@ -215,7 +215,7 @@ OperationResult sendDataTo(const Socket &socket, Buffer &data, size_t size, cons
     int result = sendto(socket.socket, data.getReadPointer(), size, 0, (sockaddr*)&ad, sizeof(ad));
 
     if (result > 0)
-        data.setReadOffset(result);
+        data.setReadOffset(result + data.getReadOffset());
     return parseReturnValue(result, size);
 }
 
