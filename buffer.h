@@ -27,6 +27,7 @@ public:
     size_t getReadOffset() const;
     void Write(const byte* source, size_t size);
     void Clear(bool full = false);
+    size_t GetRemainingFreeSpace();
     
     template<class T>
     void Write(const T* data, size_t size)

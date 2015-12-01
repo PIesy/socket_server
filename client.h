@@ -10,8 +10,10 @@
 #include "buffer.h"
 #include "socket.h"
 #include "transfer.h"
+#include "file.h"
 
 constexpr size_t MAX_BUFFER_SIZE = 2500000;
+constexpr int MAX_BATCH_SIZE = 512;
 
 class Client;
 
@@ -35,7 +37,7 @@ struct ClientStates
 
 struct FileInitState
 {
-    std::fstream file;
+    File file;
     unsigned chunksSize = 0;
     unsigned chunksCount = 0;
     std::string fileName = "";
@@ -43,7 +45,7 @@ struct FileInitState
 
 struct FileTransferState
 {
-    std::bitset<512> batchState = 0;
+    std::bitset<MAX_BATCH_SIZE> batchState = 0;
     unsigned batchSize = 0;
     unsigned chunksTransfered = 0;
     unsigned previousChunkId = -1;

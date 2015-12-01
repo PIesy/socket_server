@@ -13,6 +13,7 @@
 #include "transfer.h"
 #include "tcpclient.h"
 #include "udpclient.h"
+#include "helpers.h"
 
 struct ChildProcessData
 {
@@ -24,8 +25,11 @@ class Server
 {
     bool shutdown = false;
     int childMemoryId = 0;
+    std::string executablePath;
     Socket tcpServerSocket;
     Socket udpServerSocket;
+    std::vector<helpers::SharedMemoryDescriptor> sharedData;
+    std::vector<helpers::ProcessDescripor> processes;
     std::vector<std::thread> threads;
     std::unordered_map<u_int16_t, MachineState> tcpClients;
     std::unordered_map<u_int16_t, ClientContainer> udpClients;
@@ -47,7 +51,7 @@ class Server
     void parseCommand(ClientContainer client);
     void spawner();
 public:
-    Server(bool noInit = false);
+    Server(const std::string& executablePath, bool noInit = false);
     ~Server();
     bool Listen(unsigned short port, const std::string& ip);
     void UdpConnectionHandler();

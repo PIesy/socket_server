@@ -80,7 +80,7 @@ sockaddr_in buildAddress(const AddressIn& address)
     long ip;
 
     memset(&addr, 0, sizeof(addr));
-    inet_pton(address.domain, address.ip.c_str(), &ip);
+    inet_pton(address.domain, address.ip, &ip);
     p.s_addr = ip;
     addr.sin_family = address.domain;
     addr.sin_port = htons(address.port);
@@ -94,7 +94,8 @@ AddressIn fillAddress(const sockaddr_in& addr)
     char buff[18] = { 0 };
 
     result.domain = addr.sin_family;
-    result.ip = inet_ntop(AF_INET, (PVOID)&addr.sin_addr, buff, sizeof(buff));
+    std::string tmp = inet_ntop(AF_INET, (PVOID)&addr.sin_addr, buff, sizeof(buff));
+    memcpy(result.ip, tmp.c_str(), tmp.length());
     result.port = ntohs(addr.sin_port);
     return result;
 }
@@ -130,17 +131,19 @@ bool isConnectionAlive(const Socket& socket, bool OOB)
     return error == 0;
 }
 
-void setReadTimeout(Socket& socket, int timeout)
+void setReadTimeout(const Socket& socket, int timeout)
 {
-    setsockopt(socket.socket, SOL_SOCKET, SO_RCVTIMEO, (const char*)&timeout, sizeof(DWORD));
+    int fixedTimeout = timeout * 1000;
+    setsockopt(socket.socket, SOL_SOCKET, SO_RCVTIMEO, (const char*)&fixedTimeout, sizeof(DWORD));
 }
 
-void setWriteTimeout(Socket& socket, int timeout)
+void setWriteTimeout(const Socket& socket, int timeout)
 {
-    setsockopt(socket.socket, SOL_SOCKET, SO_SNDTIMEO, (const char*)&timeout, sizeof(DWORD));
+    int fixedTimeout = timeout * 1000;
+    setsockopt(socket.socket, SOL_SOCKET, SO_SNDTIMEO, (const char*)&fixedTimeout, sizeof(DWORD));
 }
 
-unsigned getSendBuffSize(Socket& socket)
+unsigned getSendBuffSize(const Socket& socket)
 {
     unsigned result;
     size_t sz = sizeof(result);
@@ -149,9 +152,23 @@ unsigned getSendBuffSize(Socket& socket)
     return result;
 }
 
-void setSendBuffSize(Socket& socket, unsigned size)
+void setSendBuffSize(const Socket& socket, unsigned size)
 {
     setsockopt(socket.socket, SOL_SOCKET, SO_SNDBUF, (const char*)&size, (int)sizeof(size));
+}
+
+unsigned getRecieveBuffSize(const Socket& socket)
+{
+    unsigned result;
+    size_t sz = sizeof(result);
+
+    getsockopt(socket.socket, SOL_SOCKET, SO_RCVBUF, (char*)&result, (int*)&sz);
+    return result;
+}
+
+void setRecieveBuffSize(const Socket& socket, unsigned size)
+{
+    setsockopt(socket.socket, SOL_SOCKET, SO_RCVBUF, (const char*)&size, (int)sizeof(size));
 }
 
 void enableKeepAlive(Socket& socket)
@@ -161,11 +178,11 @@ void enableKeepAlive(Socket& socket)
     setsockopt(socket.socket, SOL_SOCKET, SO_KEEPALIVE, (const char*)&val, (int)sizeof(val));
 }
 
-OperationResult getData(const Socket& socket, Buffer& buff, size_t size, bool OOB)
+OperationResult getData(const Socket& socket, Buffer& buff, size_t size, bool peek)
 {
     if (buff.getSize() < size)
         return OperationResult::Error;
-    int result = recv(socket.socket, (char*)buff.getData(), size, OOB ? MSG_OOB : 0);
+    int result = recv(socket.socket, (char*)buff.getWritePointer(), size, peek ? MSG_PEEK : 0);
 
     if (result > 0)
         buff.setWriteOffset(result + buff.getWriteOffset());
@@ -181,12 +198,18 @@ OperationResult getDataFrom(const Socket& socket, Buffer& buff, size_t size, Add
     memset(&ad, 0, sz);
     int result = recvfrom(socket.socket, (char*)buff.getWritePointer(), size, peek ? MSG_PEEK : 0, (sockaddr*)&ad, (int*)&sz);
 
+    OperationResult retVal = parseReturnValue(result, size);
     if (result > 0)
     {
         addr = fillAddress(ad);
         buff.setWriteOffset(result + buff.getWriteOffset());
     }
-    return parseReturnValue(result, size);
+    else if (result < 0 && retVal == OperationResult::Success)
+    {
+        addr = fillAddress(ad);
+        buff.setWriteOffset(size + buff.getWriteOffset());
+    }
+    return retVal;
 }
 
 OperationResult sendData(const Socket& socket, Buffer& data, size_t size)
@@ -229,6 +252,8 @@ OperationResult parseReturnValue(int value, int expectedValue)
     case WSAEWOULDBLOCK:
     case WSAETIMEDOUT:
         return OperationResult::Timeout;
+    case WSAEMSGSIZE:
+        return OperationResult::Success;
     default:
         break;
     }

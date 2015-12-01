@@ -4,10 +4,14 @@
 #include <string>
 #include <vector>
 #include "socket.h"
+#ifdef _WIN32
+#include <Windows.h>
+#endif
 #ifdef __unix__
 #include <sys/types.h>
 #include <sys/wait.h>
-using HANDLE = pid_t;
+using PROCESS_INFORMATION = pid_t;
+using HANDLE = int;
 #endif
 
 
@@ -16,12 +20,15 @@ namespace helpers
 
 struct ProcessDescripor
 {
-    HANDLE process;
+    PROCESS_INFORMATION process;
+#ifdef _WIN32
+    STARTUPINFO si;
+#endif
 };
 
 struct SharedMemoryDescriptor
 {
-    int handle;
+    HANDLE handle;
     std::string name;
     void* memory;
     size_t size;

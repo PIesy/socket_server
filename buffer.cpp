@@ -67,6 +67,11 @@ void Buffer::Clear(bool full)
         memset(data, 0, size);
 }
 
+size_t Buffer::GetRemainingFreeSpace()
+{
+    return size - writeOffset;
+}
+
 void Buffer::setWriteOffset(size_t writeOffset)
 {
     this->writeOffset = writeOffset;

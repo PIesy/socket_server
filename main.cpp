@@ -7,6 +7,7 @@ void handleParentMode(int argc, char** argv);
 
 int main(int argc, char** argv)
 {
+    std::cerr << "Process started" << std::endl;
     if (std::string(argv[0]) == "child")
         handleChildMode(argv);
     else
@@ -20,7 +21,7 @@ void handleChildMode(char** argv)
     std::cerr << "This is child process " << argv[1] << std::endl;
     helpers::SharedMemoryDescriptor desc = helpers::openSharedMemory(sizeof(ChildProcessData), argv[1]);
     ChildProcessData* data = (ChildProcessData*)desc.memory;
-    Server server(true);
+    Server server("noexec", true);
     Socket sock(data->socket);
     server.TcpConnectionHandler(std::make_shared<TCPClient>(sock));
 }
@@ -29,7 +30,7 @@ void handleParentMode(int argc, char **argv)
 {
     long port = 2115;
     std::string ip = "127.0.0.1";
-    Server server;
+    Server server(argv[0]);
     std::string str;
 
     if (argc > 2)

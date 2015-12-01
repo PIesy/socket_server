@@ -1,5 +1,8 @@
 #include "helpers.h"
 #include <fstream>
+#ifdef _WIN32
+#include <Windows.h>
+#endif
 #ifdef __unix__
 #include <unistd.h>
 #include <spawn.h>
@@ -19,33 +22,69 @@ namespace helpers
 #ifdef _WIN32
     void preallocateFile(const std::string & file, size_t size)
     {
-        //std::fstream f;
-        //char zeroBuff[1024 * 10] = { 0 };
-        //size_t zeroBuffSize = sizeof(zeroBuff);
-        //size_t remainingSize = size;
-
-  //      f.open(file, std::ios_base::out | std::ios_base::trunc | std::ios_base::binary);
-        //if (!f.is_open())
-        //    return;
-        //while (remainingSize > 0)
-        //{
-        //    if (remainingSize < zeroBuffSize)
-        //    {
-        //        f.write(zeroBuff, remainingSize);
-        //        remainingSize = 0;
-        //    }
-        //    else
-        //    {
-        //        f.write(zeroBuff, zeroBuffSize);
-        //        remainingSize -= zeroBuffSize;
-        //    }
-        //}
-        //            No actual speedup this way
+        //HANDLE f = CreateFileA(file.c_str(), GENERIC_READ | GENERIC_WRITE, 0, nullptr, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr);
+        //
+        //SetFilePointer(f, size, nullptr, FILE_BEGIN);
+        //SetEndOfFile(f);
+        //CloseHandle(f);
+        std::string cmdString = "fsutil file createnew " + file + " " + std::to_string(size);
+        system(cmdString.c_str());
     }
 
     int getMaxSocketDescriptor(const std::vector<Socket*>& sockets)
     {
         return 0;
+    }
+
+    ProcessDescripor createProcess(const std::string& executable, std::vector<std::string> args)
+    {
+        ProcessDescripor desc;
+        std::string arguments;
+        memset(&desc.process, 0, sizeof(desc.process));
+        memset(&desc.si, 0, sizeof(desc.si));
+        char buff[30] = { 0 };
+        
+        desc.si.cb = sizeof(desc.si);
+        for (std::string& arg : args)
+            arguments.append(arg + " ");
+        memcpy(buff, arguments.c_str(), arguments.length());
+        CreateProcessA(executable.c_str(), buff, nullptr, nullptr, TRUE, 0, nullptr, nullptr, &desc.si, &desc.process);
+        return desc;
+    }
+
+    void waitProcess(ProcessDescripor& descriptor)
+    {
+        WaitForSingleObject(descriptor.process.hProcess, INFINITE);
+        CloseHandle(descriptor.process.hProcess);
+        CloseHandle(descriptor.process.hThread);
+    }
+
+    SharedMemoryDescriptor createSharedMemory(size_t size, const std::string& name)
+    {
+        SharedMemoryDescriptor result;
+
+        result.name = name;
+        result.size = size;
+        result.handle = CreateFileMapping(INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE, 0, size, name.c_str());
+        result.memory = MapViewOfFile(result.handle, FILE_MAP_ALL_ACCESS, 0, 0, size);
+        return result;
+    }
+
+    SharedMemoryDescriptor openSharedMemory(size_t size, const std::string& name)
+    {
+        SharedMemoryDescriptor result;
+
+        result.name = name;
+        result.size = size;
+        result.handle = OpenFileMappingA(FILE_MAP_ALL_ACCESS, FALSE, name.c_str());
+        result.memory = MapViewOfFile(result.handle, FILE_MAP_ALL_ACCESS, 0, 0, size);
+        return result;
+    }
+
+    void removeSharedMemory(SharedMemoryDescriptor& desc)
+    {
+        UnmapViewOfFile(desc.memory);
+        CloseHandle(desc.handle);
     }
 #endif
 #ifdef __unix__
