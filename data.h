@@ -52,12 +52,13 @@ struct FileTransferPackage
     FileTransferPackage(u_int32_t chunkId = 0):chunkId(chunkId) {}
 };
 
-constexpr size_t markerResponceSize = sizeof(std::bitset<512>);
-
 struct MarkerResponce
 {
     std::bitset<512> bits;
+    u_int32_t chunkId = 0;
 };
+
+constexpr size_t markerResponceSize = sizeof(MarkerResponce);
 
 struct RedirectResponce
 {

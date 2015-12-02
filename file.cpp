@@ -18,7 +18,7 @@ void File::Write(const void* data, size_t size, size_t position)
 {
     if ((bufferedPosition + bufferedWriteSize) != position || size > buff.GetRemainingFreeSpace())
     {
-        std::cerr << "Writing data" << std::endl;
+        //std::cerr << "Writing data" << std::endl;
         file.write((const char*)buff.getData(), bufferedWriteSize);
         bufferedWriteSize = 0;
         bufferedPosition = position;

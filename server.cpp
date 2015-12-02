@@ -245,12 +245,14 @@ OperationResult Server::handleFileTransferPrepare(ClientContainer client)
 
     if (pack.isMarker == 1)
     {
+        //std::cerr << "Got marker " << pack.size << std::endl;
         respondToMarker(client, pack);
         return OperationResult::Error;
     }
     state.batchState[pack.chunkId % state.batchSize] = true;
     state.nextChunkSize = pack.size;
     state.chunkId = pack.chunkId;
+    //std::cerr << " << PACKAGE " << state.chunkId << std::endl;
     client->getState().buff.setReadOffset(sizeof(FileTransferPackage));
     return OperationResult::Success;
 }
@@ -258,21 +260,33 @@ OperationResult Server::handleFileTransferPrepare(ClientContainer client)
 void Server::respondToMarker(ClientContainer client, FileTransferPackage& pack)
 {
     Buffer buff(markerResponceSize);
-    buff.Write(client->getState().fileTransferState.batchState);
+    MarkerResponce responce;
+    responce.bits = client->getState().fileTransferState.batchState;
+    responce.chunkId = pack.chunkId - pack.size;
+    buff.Write(responce);
     if (pack.size)
+    {
+        printMissingPackages(client, pack);
         client->getState().fileTransferState.batchSize = pack.size;
-    client->Send(buff.getSize(), buff, false);
-    printMissingPackages(client, pack);
-    client->getState().fileTransferState.batchState.reset();
+        client->Send(buff.getSize(), buff, false);
+    }
+    if (!pack.size)
+        client->getState().fileTransferState.batchState.reset();
 }
 
 void Server::printMissingPackages(ClientContainer client, FileTransferPackage& pack)
 {
+    bool err = false;
     if (pack.chunkId == 0)
         return;
     for (unsigned chunkId = pack.chunkId - pack.size; chunkId < pack.chunkId; chunkId ++)
         if (client->getState().fileTransferState.batchState[chunkId % pack.size] == false)
+        {
+            err = true;
             std::cerr << "Missing package " << chunkId << std::endl;
+        }
+    if (err)
+        std::cerr << client->getState().fileTransferState.batchState.to_string() << std::endl;
 }
 
 OperationResult Server::handleFileTransferExecute(ClientContainer client)
