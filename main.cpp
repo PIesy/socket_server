@@ -23,7 +23,11 @@ void handleChildMode(char** argv)
     ChildProcessData* data = (ChildProcessData*)desc.memory;
     Server server("noexec", true);
     Socket sock(data->socket);
-    server.TcpConnectionHandler(std::make_shared<TCPClient>(sock));
+    if (std::string(argv[2]) == "tcp")
+        server.TcpConnectionHandler(std::make_shared<TCPClient>(sock));
+    else
+        server.UdpConnectionHandler(std::move(sock));
+    helpers::removeSharedMemory(desc);
 }
 
 void handleParentMode(int argc, char **argv)
@@ -51,5 +55,7 @@ void handleParentMode(int argc, char **argv)
             server.Shutdown();
             break;
         }
+        if (str == "mp" || str == "enable multiprocessing")
+            server.EnableMultiprocessMode();
     }
 }

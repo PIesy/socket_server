@@ -59,6 +59,12 @@ struct MarkerResponce
     std::bitset<512> bits;
 };
 
+struct RedirectResponce
+{
+    char newIp[18] = { 0 };
+    unsigned short newPort = 0;
+};
+
 struct ServerResponcePackage
 {
     u_int8_t responce;

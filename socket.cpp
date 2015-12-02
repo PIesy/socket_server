@@ -52,7 +52,7 @@ Socket& Socket::operator=(const sockets::Socket& rhs)
 
 Socket::~Socket()
 {
-    if (socket.isValid)
+    if (isValid)
     {
         std::cerr << "Closing socket" << std::endl;
         isValid = false;

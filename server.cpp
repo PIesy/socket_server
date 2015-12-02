@@ -42,13 +42,15 @@ Server::~Server()
 
 bool Server::Listen(unsigned short port, const std::string& ip)
 {
+    this->port = port;
+    this->ip = ip;
     if (tcpServerSocket.Bind(ip, port) == OperationResult::Error)
         return false;
     if (udpServerSocket.Bind(ip, port) == OperationResult::Error)
         return false;
     if (tcpServerSocket.Listen() == OperationResult::Error)
         return false;
-    threads.emplace_back(&Server::UdpConnectionHandler, this);
+    threads.emplace_back(&Server::udpMainLoop, this);
     threads.emplace_back(&Server::spawner, this);
     return true;
 }
@@ -66,28 +68,24 @@ void Server::Shutdown()
     }
 }
 
-void Server::UdpConnectionHandler()
+void Server::UdpConnectionHandler(Socket socket)
 {
     std::list<ClientContainer> clients;
     unsigned short port;
     std::string ip;
     Buffer buff(sizeof(Header));
 
-    std::cerr << "Ready for udp communication" << std::endl;
     while (!shutdown)
-        if (select({&udpServerSocket}, {}, {}, 1000000) && !shutdown)
-            if (asBool(udpServerSocket.RecieveFrom(buff, sizeof(Header), ip, port, true)))
+        if (select({&socket}, {}, {}, 1000000) && !shutdown)
+            if (asBool(socket.RecieveFrom(buff, sizeof(Header), ip, port, true)))
             {
                 Header& header = buff;
-                if (header.zero != 0)
-                    parseMessage(std::make_shared<UDPClient>(udpServerSocket, ip, port));
-                else
-                    parseCommand(getUdpClient(header.id, ip, port));
+                parseCommand(getUdpClient(header.id, ip, port, socket));
                 buff.Clear();
             }
 }
 
-ClientContainer Server::getUdpClient(u_int8_t id, const std::string& ip, unsigned short port)
+ClientContainer Server::getUdpClient(u_int8_t id, const std::string& ip, unsigned short port, Socket& socket)
 {
     if (udpClients.count(id))
     {
@@ -97,7 +95,7 @@ ClientContainer Server::getUdpClient(u_int8_t id, const std::string& ip, unsigne
          return cont;
     }
     std::cerr << "New client id:" << (int)id << " address: " << ip << ":" << port << std::endl;
-    udpClients.insert({id, std::make_shared<UDPClient>(udpServerSocket, ip, port)});
+    udpClients.insert({id, std::make_shared<UDPClient>(socket, ip, port)});
     return udpClients.at(id);
 }
 
@@ -109,6 +107,11 @@ void Server::TcpConnectionHandler(ClientContainer client)
     while (!shutdown && !clients.empty())
         serveAll(clients);
     std::cerr << "Connection handler stopped" << std::endl;
+}
+
+void Server::EnableMultiprocessMode()
+{
+    multiprocessMode = true;
 }
 
 OperationResult Server::serveAll(std::list<ClientContainer>& clients)
@@ -336,29 +339,69 @@ void Server::spawner()
     Socket connectionSocket;
 
     while (!shutdown)
-        if (select({&tcpServerSocket}, {}, {}, 10000) && !shutdown)
+        if (select({&tcpServerSocket}, {}, {}, 1000000) && !shutdown)
         {
             tcpServerSocket.Accept(connectionSocket);
             if (connectionSocket.IsValid())
             {
                 std::cerr << "Accepted connection " << connectionSocket.getIp() << ":" << connectionSocket.getPort() << std::endl;
-                launchNewProcess(connectionSocket);
-                //threads.emplace_back(&Server::TcpConnectionHandler, this, std::make_shared<TCPClient>(connectionSocket));
+                if (multiprocessMode)
+                    launchNewProcess(connectionSocket, SocketType::TCP);
+                else
+                    threads.emplace_back(&Server::TcpConnectionHandler, this, std::make_shared<TCPClient>(connectionSocket));
             }
         }
     std::cerr << "spawner stopped" << std::endl;
 }
 
-void Server::launchNewProcess(Socket& socket)
+void Server::udpMainLoop()
+{
+    unsigned short port;
+    std::string ip;
+    Buffer buff(sizeof(Header));
+    RedirectResponce redirect;
+
+    std::cerr << "Ready for udp communication" << std::endl;
+    while (!shutdown)
+        if (select({&udpServerSocket}, {}, {}, 1000000) && !shutdown)
+            if (asBool(udpServerSocket.RecieveFrom(buff, sizeof(Header), ip, port)))
+            {
+                Header& header = buff;
+                if (header.zero != 0)
+                    parseMessage(std::make_shared<UDPClient>(udpServerSocket, ip, port));
+                else
+                {
+                    Socket clientSocket;
+                    clientSocket.Create(SocketType::UDP);
+                    clientSocket.Bind(this->ip, this->port + childMemoryId);
+                    sockets::setRecieveBuffSize(clientSocket.getSocket(), 2000000);
+                    redirect.newPort = this->port + childMemoryId;
+                    memcpy(redirect.newIp, this->ip.c_str(), this->ip.length());
+                    Buffer msg(sizeof(RedirectResponce));
+                    msg.Write(redirect);
+                    udpServerSocket.SendTo(msg, msg.getSize(), ip, port);
+                    if (multiprocessMode)
+                        launchNewProcess(clientSocket, SocketType::UDP);
+                    else
+                        threads.emplace_back(&Server::UdpConnectionHandler, this, std::move(clientSocket));
+                }
+                buff.Clear();
+            }
+}
+
+
+
+void Server::launchNewProcess(Socket& socket, SocketType type)
 {
     ChildProcessData data;
     helpers::SharedMemoryDescriptor desc = helpers::createSharedMemory(sizeof(data), "child" + std::to_string(childMemoryId));
-    sharedData.push_back(desc);
+    std::string typeString = type == SocketType::TCP ? "tcp" : "udp";
 
+    sharedData.push_back(desc);
     data.shutdown = &shutdown;
     data.socket = socket.getSocket();
     socket.Invalidate();
     childMemoryId++;
     memcpy(desc.memory, &data, sizeof(data));
-    processes.push_back(helpers::createProcess(executablePath, {"child", desc.name}));
+    processes.push_back(helpers::createProcess(executablePath, {"child", desc.name, typeString}));
 }
